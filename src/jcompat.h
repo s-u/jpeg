@@ -10,7 +10,7 @@
    older jpeglib versions since they are still quite common */
 #if (JPEG_LIB_VERSION < 80)
 
-METHODDEF(void) noop_fn (struct jpeg_decompress_struct cinfo) { }
+METHODDEF(void) noop_fn (struct jpeg_decompress_struct *cinfo) { }
 
 static JOCTET eoi_buf[2] = { 255, JPEG_EOI };
 

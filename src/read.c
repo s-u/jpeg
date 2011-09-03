@@ -3,12 +3,15 @@
 #include <string.h>
 #include <jpeglib.h>
 
+#include "jcompat.h"
+
 #define VERBOSE_INFO 1
 
 #if (BITS_IN_JSAMPLE != 8)
 #error "Sorry, only 8-bit libjpeg is supported"
 #endif
 
+#define USE_RINTERNALS 1
 #include <Rinternals.h>
 /* for R_RGB / R_RGBA */
 #include <R_ext/GraphicsEngine.h>
@@ -31,39 +34,74 @@ Rjpeg_output_message (j_common_ptr cinfo)
     REprintf("JPEG decompression: %s", buffer);
 }
 
+static void Rjpeg_fin(SEXP dco) {
+    struct jpeg_common_struct *cinfo = (struct jpeg_common_struct*) R_ExternalPtrAddr(dco);
+    if (cinfo) {
+	jpeg_destroy(cinfo);
+	free(cinfo->err);
+	free(cinfo);
+    }
+    /* make it a NULL ptr in case this was not a finalizer call */
+    CAR(dco) = 0;
+}
+
+/* create an R object containing the initialized decompression
+   structure. The object will ensure proper release of the jpeg struct. */
+static SEXP Rjpeg_decompress(struct jpeg_decompress_struct **cinfo_ptr) {
+    SEXP dco;
+    struct jpeg_decompress_struct *cinfo = (struct jpeg_decompress_struct*) malloc(sizeof(struct jpeg_decompress_struct));
+    struct jpeg_error_mgr *jerr = 0;
+
+    if (cinfo)
+	jerr = (struct jpeg_error_mgr*) malloc(sizeof(struct jpeg_error_mgr));
+    if (!jerr) {
+	if (cinfo) free(cinfo);
+	Rf_error("Unable to allocate jpeg decompression structure");
+    }
+    
+    cinfo->err = jpeg_std_error(jerr);
+    jerr->error_exit = Rjpeg_error_exit;
+    jerr->output_message = Rjpeg_output_message;
+    
+    jpeg_create_decompress(cinfo);
+
+    *cinfo_ptr = cinfo;
+
+    dco = PROTECT(R_MakeExternalPtr(cinfo, R_NilValue, R_NilValue));
+    R_RegisterCFinalizerEx(dco, Rjpeg_fin, TRUE);
+    UNPROTECT(1);
+    return dco;
+}
+
+
 #define RX_swap32(X) (X) = (((unsigned int)X) >> 24) | ((((unsigned int)X) >> 8) & 0xff00) | (((unsigned int)X) << 24) | ((((unsigned int)X) & 0xff00) << 8)
 
 SEXP read_jpeg(SEXP sFn, SEXP sNative) {
     const char *fn;
-    SEXP res = R_NilValue, dim;
+    SEXP res = R_NilValue, dim, dco;
     int native = asInteger(sNative);
     FILE *f = 0;
 
-    struct jpeg_decompress_struct cinfo;
-    struct jpeg_error_mgr jerr;
+    struct jpeg_decompress_struct *cinfo;
 
-    cinfo.err = jpeg_std_error(&jerr);
-    jerr.error_exit = Rjpeg_error_exit;
-    jerr.output_message = Rjpeg_output_message;
+    dco = PROTECT(Rjpeg_decompress(&cinfo));
     
-    if (TYPEOF(sFn) == RAWSXP) {
-	jpeg_create_decompress(&cinfo);
-	jpeg_mem_src(&cinfo, (unsigned char*) RAW(sFn), (unsigned long) LENGTH(sFn));
-    } else {
+    if (TYPEOF(sFn) == RAWSXP)
+	jpeg_mem_src(cinfo, (unsigned char*) RAW(sFn), (unsigned long) LENGTH(sFn));
+    else {
 	if (TYPEOF(sFn) != STRSXP || LENGTH(sFn) < 1) Rf_error("invalid filename");
 	fn = CHAR(STRING_ELT(sFn, 0));
 	f = fopen(fn, "rb");
 	if (!f) Rf_error("unable to open %s", fn);
-	jpeg_create_decompress(&cinfo);
-	jpeg_stdio_src(&cinfo, f);
+	jpeg_stdio_src(cinfo, f);
     }
 
-    jpeg_read_header(&cinfo, TRUE);
-    jpeg_start_decompress(&cinfo);
+    jpeg_read_header(cinfo, TRUE);
+    jpeg_start_decompress(cinfo);
 	
     {
 	int need_swap = 0;
-	int width = cinfo.output_width, height = cinfo.output_height, pln = cinfo.output_components;
+	int width = cinfo->output_width, height = cinfo->output_height, pln = cinfo->output_components;
 	int rowbytes = width * pln;
 	unsigned char *image;
 	JSAMPROW line;
@@ -89,9 +127,9 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 	/* allocate data for row pointers and the image using R's allocation */
 	image = (unsigned char *) R_alloc(rowbytes, height);
 	
-	while (cinfo.output_scanline < cinfo.output_height) {
-	    line = image + rowbytes * cinfo.output_scanline;
-	    jpeg_read_scanlines(&cinfo, &line, 1);
+	while (cinfo->output_scanline < cinfo->output_height) {
+	    line = image + rowbytes * cinfo->output_scanline;
+	    jpeg_read_scanlines(cinfo, &line, 1);
 	}
 	
 	/* native output - vector of integers */
@@ -159,11 +197,12 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 	}
     }
 
-    jpeg_finish_decompress(&cinfo);
-    
-    jpeg_destroy_decompress(&cinfo);
-
     if (f) fclose(f);
+
+    /* call the finalizer directly so we don't need to wait
+       for the garbage collection */
+    Rjpeg_fin(dco);
+    UNPROTECT(1);
 
     return res;
 }

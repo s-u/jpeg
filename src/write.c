@@ -1,3 +1,44 @@
+#include "rjcommon.h"
+
+/* create an R object containing the initialized compression
+   structure. The object will ensure proper release of the jpeg struct. */
+static SEXP Rjpeg_compress(struct jpeg_compress_struct **cinfo_ptr) {
+    SEXP dco;
+    struct jpeg_compress_struct *cinfo = (struct jpeg_compress_struct*) malloc(sizeof(struct jpeg_compress_struct));
+    struct jpeg_error_mgr *jerr = 0;
+
+    if (cinfo)
+	jerr = (struct jpeg_error_mgr*) malloc(sizeof(struct jpeg_error_mgr));
+    if (!jerr) {
+	if (cinfo) free(cinfo);
+	Rf_error("Unable to allocate jpeg compression structure");
+    }
+    
+    cinfo->err = jpeg_std_error(jerr);
+    jerr->error_exit = Rjpeg_error_exit;
+    jerr->output_message = Rjpeg_output_message;
+    
+    jpeg_create_compress(cinfo);
+
+    *cinfo_ptr = cinfo;
+
+    dco = PROTECT(R_MakeExternalPtr(cinfo, R_NilValue, R_NilValue));
+    R_RegisterCFinalizerEx(dco, Rjpeg_fin, TRUE);
+    UNPROTECT(1);
+    return dco;
+}
+
+SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
+    struct jpeg_compress_struct *cinfo;
+    SEXP dco = PROTECT(Rjpeg_compress(&cinfo));
+
+    Rjpeg_fin(dco);
+    UNPROTECT(1);
+
+    return R_NilValue;
+}
+
+
 #if 0
 
 #include <stdio.h>

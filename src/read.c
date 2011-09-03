@@ -5,18 +5,11 @@
 static SEXP Rjpeg_decompress(struct jpeg_decompress_struct **cinfo_ptr) {
     SEXP dco;
     struct jpeg_decompress_struct *cinfo = (struct jpeg_decompress_struct*) malloc(sizeof(struct jpeg_decompress_struct));
-    struct jpeg_error_mgr *jerr = 0;
 
-    if (cinfo)
-	jerr = (struct jpeg_error_mgr*) malloc(sizeof(struct jpeg_error_mgr));
-    if (!jerr) {
-	if (cinfo) free(cinfo);
+    if (!cinfo)
 	Rf_error("Unable to allocate jpeg decompression structure");
-    }
     
-    cinfo->err = jpeg_std_error(jerr);
-    jerr->error_exit = Rjpeg_error_exit;
-    jerr->output_message = Rjpeg_output_message;
+    cinfo->err = Rjpeg_new_err();
     
     jpeg_create_decompress(cinfo);
 

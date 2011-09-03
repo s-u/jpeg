@@ -1,22 +1,18 @@
 #include "rjcommon.h"
 
+/* alpha - blending:  X * A + (1 - X) * BG   */
+#define ABLEND(X, A, BG)  (JSAMPLE) ((((unsigned int)X) * ((unsigned int)A) + ((unsigned int)BG) * (255 - ((unsigned int)A))) / 255)
+
 /* create an R object containing the initialized compression
    structure. The object will ensure proper release of the jpeg struct. */
 static SEXP Rjpeg_compress(struct jpeg_compress_struct **cinfo_ptr) {
     SEXP dco;
     struct jpeg_compress_struct *cinfo = (struct jpeg_compress_struct*) malloc(sizeof(struct jpeg_compress_struct));
-    struct jpeg_error_mgr *jerr = 0;
 
-    if (cinfo)
-	jerr = (struct jpeg_error_mgr*) malloc(sizeof(struct jpeg_error_mgr));
-    if (!jerr) {
-	if (cinfo) free(cinfo);
-	Rf_error("Unable to allocate jpeg compression structure");
-    }
+    if (!cinfo)
+	Rf_error("Unable to allocate jpeg decompression structure");
     
-    cinfo->err = jpeg_std_error(jerr);
-    jerr->error_exit = Rjpeg_error_exit;
-    jerr->output_message = Rjpeg_output_message;
+    cinfo->err = Rjpeg_new_err();
     
     jpeg_create_compress(cinfo);
 
@@ -28,96 +24,52 @@ static SEXP Rjpeg_compress(struct jpeg_compress_struct **cinfo_ptr) {
     return dco;
 }
 
-SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
-    struct jpeg_compress_struct *cinfo;
-    SEXP dco = PROTECT(Rjpeg_compress(&cinfo));
+METHODDEF(void) dst_noop_fn (struct jpeg_compress_struct *cinfo) { }
 
-    Rjpeg_fin(dco);
-    UNPROTECT(1);
+METHODDEF(boolean)
+empty_output_buffer (struct jpeg_compress_struct *cinfo)
+{
+    JSAMPLE *buf = (JSAMPLE*) Rjpeg_mem_ptr(cinfo);
+    unsigned long size = Rjpeg_mem_size(cinfo);
+    size *= 2;
+    buf = realloc(buf, size);
+    if (!buf)
+	Rf_error("Unable to enlarge output buffer to %lu bytes.", size);
+    cinfo->dest->next_output_byte = buf + size / 2;
+    cinfo->dest->free_in_buffer = size / 2;
+    Rjpeg_mem_ptr(cinfo) = buf;
+    Rjpeg_mem_size(cinfo) = size;
 
-    return R_NilValue;
+    return TRUE;
 }
 
-
-#if 0
-
-#include <stdio.h>
-#include <png.h>
+/* size of the initial buffer; it is doubled when exceeded */
+#define INIT_SIZE 65536
 
 #include <Rinternals.h>
 /* for R_RED, ..., R_ALPHA */
 #include <R_ext/GraphicsEngine.h>
 
-typedef struct write_job {
-    FILE *f;
-    int ptr, len;
-    char *data;
-    SEXP rvlist, rvtail;
-    int rvlen;
-} write_job_t;
-
-/* default size of a raw vector chunk when collecting the image result */
-#define INIT_SIZE (1024*256)
-
-static void user_error_fn(png_structp png_ptr, png_const_charp error_msg) {
-    write_job_t *rj = (write_job_t*)png_get_error_ptr(png_ptr);
-    if (rj->f) fclose(rj->f);
-    Rf_error("libpng error: %s", error_msg);
-}
-
-static void user_warning_fn(png_structp png_ptr, png_const_charp warning_msg) {
-    Rf_warning("libpng warning: %s", warning_msg);
-}
-
-static void user_write_data(png_structp png_ptr, png_bytep data, png_size_t length) {
-    write_job_t *rj = (write_job_t*) png_get_io_ptr(png_ptr);
-    png_size_t to_write = length;
-    while (length) { /* use iteration instead of recursion */
-	if (to_write > (rj->len - rj->ptr))
-	    to_write = (rj->len - rj->ptr);
-	if (to_write > 0) {
-	    memcpy(rj->data + rj->ptr, data, to_write);
-	    rj->ptr += to_write;
-	    length -= to_write;
-	    data += to_write;
-	    rj->rvlen += to_write;
-	}
-	if (length) { /* more to go -- need next buffer */
-	    SEXP rv = allocVector(RAWSXP, INIT_SIZE);
-	    SETCDR(rj->rvtail, CONS(rv, R_NilValue));
-	    rj->rvtail = CDR(rj->rvtail);
-	    rj->len = LENGTH(rv);
-	    rj->data = (char*) RAW(rv);
-	    rj->ptr = 0;
-	    to_write = length;
-	}
-    }
-}
-
-static void user_flush_data(png_structp png_ptr) {
-}
-
-#if USE_R_MALLOC
-static png_voidp malloc_fn(png_structp png_ptr, png_alloc_size_t size) {
-    return (png_voidp) R_alloc(1, size);
-}
-
-static void free_fn(png_structp png_ptr, png_voidp ptr) {
-    /* this is a no-op because R releases the memory at the end of the call */
-}
-#endif
-
 #define RX_swap32(X) (X) = (((unsigned int)X) >> 24) | ((((unsigned int)X) >> 8) & 0xff00) | (((unsigned int)X) << 24) | ((((unsigned int)X) & 0xff00) << 8)
 
-SEXP write_png(SEXP image, SEXP sFn) {
-    SEXP res = R_NilValue, dims;
+static unsigned int clip_alpha(double v) {
+    if (v < 0.0) v = 0.0;
+    if (v > 1.0) v = 1.0;
+    return (unsigned int)(v * 255.0);
+}
+
+SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
+    SEXP res = R_NilValue, dims, dco;
     const char *fn;
-    int planes = 1, width, height, native = 0, raw_array = 0;
-    FILE *f;
-    write_job_t rj;
-    png_structp png_ptr;
-    png_infop info_ptr;
+    double quality = Rf_asReal(sQuality);
+    int planes = 1, width, height, native = 0, raw_array = 0, outpl, bg;
+    FILE *f = 0;
+    struct jpeg_compress_struct *cinfo;
     
+    if (length(sBg) < 1)
+	Rf_error("invalid background color specification");
+    bg = RGBpar(sBg, 0);
+
     if (inherits(image, "nativeRaster") && TYPEOF(image) == INTSXP)
 	native = 1;
     
@@ -157,148 +109,145 @@ SEXP write_png(SEXP image, SEXP sFn) {
 	} else
 	    planes = 4;
     }
+    /* FIXME: for JPEG 3-channel raw array may also make sense ...*/
     if (raw_array) {
 	if (planes != 4)
 	    Rf_error("Only RGBA format is supported as raw data");
 	native = 1; /* from now on we treat raw arrays like native */
     }
 
+    dco = PROTECT(Rjpeg_compress(&cinfo));
+
     if (TYPEOF(sFn) == RAWSXP) {
-	SEXP rv = allocVector(RAWSXP, INIT_SIZE);
-	rj.rvtail = rj.rvlist = PROTECT(CONS(rv, R_NilValue));
-	rj.data = (char*) RAW(rv);
-	rj.len = LENGTH(rv);
-	rj.ptr = 0;
-	rj.rvlen = 0;
-	rj.f = f = 0;
+	JSAMPLE *buf = (JSAMPLE*) malloc(INIT_SIZE);
+	if (!buf)
+	    Rf_error("Unable to allocate output buffer");
+
+	if (!cinfo->dest)
+	    cinfo->dest = (struct jpeg_destination_mgr *)
+		(*cinfo->mem->alloc_small) ((j_common_ptr) cinfo, JPOOL_PERMANENT,
+					    sizeof(struct jpeg_destination_mgr));
+	cinfo->dest->init_destination = dst_noop_fn;
+	cinfo->dest->empty_output_buffer = empty_output_buffer;
+	/* unfortunately the design of dest is flawed (to say it mildly)
+	   since it doesn't call term on error/abort so it's useless */
+	cinfo->dest->term_destination = dst_noop_fn;
+	cinfo->dest->next_output_byte = buf;
+	cinfo->dest->free_in_buffer = INIT_SIZE;
+	Rjpeg_mem_ptr(cinfo) = buf;
+	Rjpeg_mem_size(cinfo) = INIT_SIZE;
     } else {
 	if (TYPEOF(sFn) != STRSXP || LENGTH(sFn) < 1) Rf_error("invalid filename");
 	fn = CHAR(STRING_ELT(sFn, 0));
 	f = fopen(fn, "wb");
 	if (!f) Rf_error("unable to create %s", fn);
-	rj.f = f;
+	jpeg_stdio_dest(cinfo, f);
     }
 
-    /* use our own error hanlding code and pass the fp so it can be closed on error */
-    png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, (png_voidp)&rj, user_error_fn, user_warning_fn);
-    if (!png_ptr) {
-	if (f) fclose(f);
-	Rf_error("unable to initialize libpng");
-    }
-    
-    info_ptr = png_create_info_struct(png_ptr);
-    if (!info_ptr) {
-	if (f) fclose(f);
-	png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
-	Rf_error("unable to initialize libpng");
-    }
-    
-    if (f)
-	png_init_io(png_ptr, f);
-    else
-	png_set_write_fn(png_ptr, (png_voidp) &rj, user_write_data, user_flush_data);
+    /* JPEG only supports RGB or G (apart from CMYK that we don't use...) */
+    outpl = (planes > 2) ? 3 : 1;
 
-    png_set_IHDR(png_ptr, info_ptr, width, height, 8,
-		 (planes == 1) ? PNG_COLOR_TYPE_GRAY : ((planes == 2) ? PNG_COLOR_TYPE_GRAY_ALPHA : ((planes == 3) ? PNG_COLOR_TYPE_RGB : PNG_COLOR_TYPE_RGB_ALPHA)),
-		 PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+    cinfo->image_width = width;
+    cinfo->image_height = height;
+    cinfo->input_components = outpl;
+    cinfo->in_color_space = (outpl == 3) ? JCS_RGB : JCS_GRAYSCALE;
+
+    jpeg_set_defaults(cinfo);
+
+    if (quality < 0.0) quality = 0.0;
+    if (quality > 1.0) quality = 1.0;
+    if (isnan(quality)) quality = 0.7;
+    jpeg_set_quality(cinfo, (int) (quality * 100.0 + 0.49), FALSE);
+    /* jpeg_simple_progression(cinfo); optional */
+    jpeg_start_compress(cinfo, TRUE);
 
     {
-	int rowbytes = width * planes, i;
-	png_bytepp row_pointers;
-	png_bytep  flat_rows;
+	int rowbytes = width * outpl;
+	JSAMPROW   row_pointer;
+	JSAMPLE *  flat_rows;
 	
-	row_pointers = (png_bytepp) R_alloc(height, sizeof(png_bytep));
-	flat_rows = (png_bytep) R_alloc(height, width * planes);
-	for(i = 0; i < height; i++)
-	    row_pointers[i] = flat_rows + (i * width * planes);
+	flat_rows = (JSAMPLE*) R_alloc(height, width * outpl);
 	
 	if (!native) {
 	    int x, y, p, pls = width * height;
 	    double *data = REAL(image);
 	    for(y = 0; y < height; y++)
 		for (x = 0; x < width; x++)
-		    for (p = 0; p < planes; p++) {
+		    for (p = 0; p < outpl; p++) {
 			double v = data[y + x * height + p * pls];
 			if (v < 0) v = 0;
 			if (v > 255.0) v = 1.0;
-			row_pointers[y][x * planes + p] = (unsigned char)(v * 255.0 + 0.5);
+			flat_rows[y * rowbytes +  x * outpl + p] = (unsigned char)(v * 255.0 + 0.5);
 		    }
+	    /* if there is alpha, we need to blend the background */
+	    if (planes == 2) {
+		for(y = 0; y < height; y++)
+		    for (x = 0; x < width; x++) {
+			unsigned int a = clip_alpha(data[y + x * height + pls]);
+			if (a != 255) flat_rows[y * rowbytes + x] = ABLEND(flat_rows[y * rowbytes + x], a, R_RED(bg));
+		    }
+	    } else if(planes == 4) {
+		for(y = 0; y < height; y++)
+		    for (x = 0; x < width; x++) {
+			unsigned int a = clip_alpha(data[y + x * height + 3 * pls]);
+			if (a != 255) {
+			    flat_rows[y * rowbytes + x * 3]     = ABLEND(flat_rows[y * rowbytes + x * 3]    , a, R_RED(bg));
+			    flat_rows[y * rowbytes + x * 3 + 1] = ABLEND(flat_rows[y * rowbytes + x * 3 + 1], a, R_GREEN(bg));
+			    flat_rows[y * rowbytes + x * 3 + 2] = ABLEND(flat_rows[y * rowbytes + x * 3 + 2], a, R_BLUE(bg));
+			}
+		    }
+	    }
 	} else {
-	    if (planes == 4) { /* 4 planes - efficient - just copy it all */
-	      int y, *idata = raw_array ? ((int*) RAW(image)) : INTEGER(image), need_swap = 0;
-		for (y = 0; y < height; idata += width, y++)
-		    memcpy(row_pointers[y], idata, width * sizeof(int));
-		
-		/* on little-endian machines it's all well, but on big-endian ones we'll have to swap */
-#if ! defined (__BIG_ENDIAN__) && ! defined (__LITTLE_ENDIAN__)   /* old compiler so have to use run-time check */
-		{
-		    char bo[4] = { 1, 0, 0, 0 };
-		    int bi;
-		    memcpy(&bi, bo, 4);
-		    if (bi != 1)
-			need_swap = 1;
-		}
-#endif
-#ifdef __BIG_ENDIAN__
-		need_swap = 1;
-#endif
-		if (need_swap) {
-		    int *ide = idata;
-		    for (; idata < ide; idata++)
-			RX_swap32(*idata);
-		}
+	    if (planes == 4) { /* RGBA */
+		int x, y, *idata = INTEGER(res);
+		for (y = 0; y < height; y++)
+		    for (x = 0; x < rowbytes; idata++) {
+			flat_rows[y * rowbytes + x++] = ABLEND(R_RED(*idata),   R_ALPHA(*idata), R_RED(bg));
+			flat_rows[y * rowbytes + x++] = ABLEND(R_GREEN(*idata), R_ALPHA(*idata), R_GREEN(bg));
+			flat_rows[y * rowbytes + x++] = ABLEND(R_BLUE(*idata),  R_ALPHA(*idata), R_BLUE(bg));
+		    }
 	    } else if (planes == 3) { /* RGB */
 		int x, y, *idata = INTEGER(res);
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < rowbytes; idata++) {
-			row_pointers[y][x++] = R_RED(*idata);
-			row_pointers[y][x++] = R_GREEN(*idata);
-			row_pointers[y][x++] = R_BLUE(*idata);
+			flat_rows[y * rowbytes + x++] = R_RED(*idata);
+			flat_rows[y * rowbytes + x++] = R_GREEN(*idata);
+			flat_rows[y * rowbytes + x++] = R_BLUE(*idata);
 		    }
 	    } else if (planes == 2) { /* GA */
 		int x, y, *idata = INTEGER(res);
 		for (y = 0; y < height; y++)
-		    for (x = 0; x < rowbytes; idata++) {
-			row_pointers[y][x++] = R_RED(*idata);
-			row_pointers[y][x++] = R_ALPHA(*idata);
-		    }
+		    for (x = 0; x < rowbytes; idata++)
+			flat_rows[y * rowbytes + x++] = ABLEND(R_RED(*idata), R_ALPHA(*idata), R_RED(bg));
 	    } else { /* gray */
 		int x, y, *idata = INTEGER(res);
 		for (y = 0; y < height; y++)
-		  for (x = 0; x < rowbytes; idata++)
-		    row_pointers[y][x++] = R_RED(*idata);
+		    for (x = 0; x < rowbytes; idata++)
+			flat_rows[y * rowbytes + x++] = R_RED(*idata);
 	    }
 	}
-
-    	png_set_rows(png_ptr, info_ptr, row_pointers);
+	
+        while (cinfo->next_scanline < cinfo->image_height) {
+            row_pointer = flat_rows + cinfo->next_scanline * rowbytes;
+            jpeg_write_scanlines(cinfo, &row_pointer, 1);
+	}
     }
 
-    png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, NULL);
-
-    png_destroy_write_struct(&png_ptr, &info_ptr);
+    jpeg_finish_compress(cinfo);
 
     if (f) { /* if it is a file, just return */
 	fclose(f);
+	Rjpeg_fin(dco);
+	UNPROTECT(1);
 	return R_NilValue;
     }
     
-    /* otherwise collect the vector blocks into one vector */
-    res = allocVector(RAWSXP, rj.rvlen);
     {
-	int to_go = rj.rvlen;
-	unsigned char *data = RAW(res);
-	while (to_go && rj.rvlist != R_NilValue) {
-	    SEXP ve = CAR(rj.rvlist);
-	    int this_len = (to_go > LENGTH(ve)) ? LENGTH(ve) : to_go;
-	    memcpy(data, RAW(ve), this_len);
-	    to_go -= this_len;
-	    data += this_len;
-	    rj.rvlist = CDR(rj.rvlist);
-	}
+	unsigned long len = (char*)cinfo->dest->next_output_byte - (char*)Rjpeg_mem_ptr(cinfo);
+	res = allocVector(RAWSXP, len);
+	memcpy(RAW(res), Rjpeg_mem_ptr(cinfo), len);
     }
     
     UNPROTECT(1);
     return res;
 }
-
-#endif

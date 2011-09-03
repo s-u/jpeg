@@ -7,23 +7,30 @@ Write a bitmap image in JPEG format
 Create a JPEG image from an array or matrix.
 }
 \usage{
-writeJPEG(image, target)
+writeJPEG(image, target, quality = 0.7, bg = "white")
 }
 \arguments{
   \item{image}{image represented by a real matrix or array with values
-  in the range of 0 to 1. Values outside this range will be
-  clipped. The object must be either two-dimensional (grayscale
-  matrix) or three dimensional array (third dimension specifying the
-  plane) and must have either one (grayscale), two (grayscale +
-  alpha), three (RGB) or four (RGB + alpha) planes. (For alternative
-  image specifications see deatils)}
+    in the range of 0 to 1. Values outside this range will be
+    clipped. The object must be either two-dimensional (grayscale
+    matrix) or three dimensional array (third dimension specifying the
+    plane) and must have either one (grayscale), two (grayscale +
+    alpha), three (RGB) or four (RGB + alpha) planes. (For alternative
+    image specifications see deatils)}
   \item{target}{Either name of the file to write to or a raw vector
-  (\code{raw()} is good enough) indicating that the output should be a
-  raw vector.}
+    (\code{raw()} is good enough) indicating that the output should be a
+    raw vector.}
+  \item{quality}{JPEG quality - a real number between 0 (lowest) and 1
+    (highest) controlling the quality of the output. Lower quality
+    produces smaller, but more lossy files.}
+  \item{bg}{background color - used only if the input contains alpha
+    channel since JPEG does not support storage of the alpha channel and
+    thus the image needs to be flattened as if it was placed over the
+    background of this color.}
 }
 \value{
-Either NULL if the target is a file or a raw vector containing the
-compressed JPEG image if the target was a raw vector.
+  Either NULL if the target is a file or a raw vector containing the
+  compressed JPEG image if the target was a raw vector.
 }
 \details{
   \code{writeJPEG} takes an image as input and compresses it into JPEG
@@ -66,11 +73,11 @@ compressed JPEG image if the target was a raw vector.
 \examples{
 # read a sample file (R logo)
 img <- readJPEG(system.file("img","Rlogo.jpg",package="jpeg"))
-# write the image into a raw vector
-r <- writeJPEG(img, raw())
+# write the image into a raw vector - using a low quality
+r <- writeJPEG(img, raw(), quality=0.3)
 # read it back again
 img2 <- readJPEG(r)
-# it better be the same
+# it will be different
 identical(img, img2)
 # try to write a native raster
 img3 <- readJPEG(system.file("img","Rlogo.jpg",package="jpeg"), TRUE)

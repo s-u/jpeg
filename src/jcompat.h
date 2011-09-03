@@ -4,6 +4,7 @@
 #define J_COMPAT_H
 
 #include "jpeglib.h"
+#include "jerror.h"
 
 /* memory-based source is new in v8 so we need to provide it for
    older jpeglib versions since they are still quite common */

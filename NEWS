@@ -3,6 +3,8 @@ NEWS/Changelog
 0.1-2	(under development)
     o	allow conections as target for writeJPEG()
 
+    o	make raw() the default target in writeJPEG()
+
 0.1-1	2011-09-03
     o	initial release (based on the png 0.1-3 package)
 

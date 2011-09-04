@@ -1,4 +1,4 @@
-writeJPEG <- function(image, target, quality = 0.7, bg = "white") {
+writeJPEG <- function(image, target = raw(), quality = 0.7, bg = "white") {
   if (inherits(target, "connection")) {
     r <- .Call("write_jpeg", image, raw(), quality, bg, PACKAGE="jpeg")
     writeBin(r, target)

@@ -7,7 +7,7 @@ Write a bitmap image in JPEG format
 Create a JPEG image from an array or matrix.
 }
 \usage{
-writeJPEG(image, target, quality = 0.7, bg = "white")
+writeJPEG(image, target = raw(), quality = 0.7, bg = "white")
 }
 \arguments{
   \item{image}{image represented by a real matrix or array with values
@@ -17,9 +17,9 @@ writeJPEG(image, target, quality = 0.7, bg = "white")
     plane) and must have either one (grayscale), two (grayscale +
     alpha), three (RGB) or four (RGB + alpha) planes. (For alternative
     image specifications see deatils)}
-  \item{target}{Either name of the file to write to or a binary
-    connection or a raw vector (\code{raw()} is good enough) indicating
-    that the output should be a raw vector.}
+  \item{target}{Either name of the file to write to, or a binary
+    connection, or a raw vector (\code{raw()} - the default - is good
+    enough) indicating that the output should be a raw vector.}
   \item{quality}{JPEG quality - a real number between 0 (lowest) and 1
     (highest) controlling the quality of the output. Lower quality
     produces smaller, but more lossy files.}

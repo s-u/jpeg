@@ -1,2 +1,7 @@
-writeJPEG <- function(image, target, quality = 0.7, bg = "white")
-  invisible(.Call("write_jpeg", image, if (is.raw(target)) target else path.expand(target), quality, bg, PACKAGE="jpeg"))
+writeJPEG <- function(image, target, quality = 0.7, bg = "white") {
+  if (inherits(target, "connection")) {
+    r <- .Call("write_jpeg", image, raw(), quality, bg, PACKAGE="jpeg")
+    writeBin(r, target)
+    invisible(NULL)
+  } else invisible(.Call("write_jpeg", image, if (is.raw(target)) target else path.expand(target), quality, bg, PACKAGE="jpeg"))
+}

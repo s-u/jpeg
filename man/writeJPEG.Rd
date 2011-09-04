@@ -17,9 +17,9 @@ writeJPEG(image, target, quality = 0.7, bg = "white")
     plane) and must have either one (grayscale), two (grayscale +
     alpha), three (RGB) or four (RGB + alpha) planes. (For alternative
     image specifications see deatils)}
-  \item{target}{Either name of the file to write to or a raw vector
-    (\code{raw()} is good enough) indicating that the output should be a
-    raw vector.}
+  \item{target}{Either name of the file to write to or a binary
+    connection or a raw vector (\code{raw()} is good enough) indicating
+    that the output should be a raw vector.}
   \item{quality}{JPEG quality - a real number between 0 (lowest) and 1
     (highest) controlling the quality of the output. Lower quality
     produces smaller, but more lossy files.}
@@ -29,17 +29,19 @@ writeJPEG(image, target, quality = 0.7, bg = "white")
     background of this color.}
 }
 \value{
-  Either NULL if the target is a file or a raw vector containing the
-  compressed JPEG image if the target was a raw vector.
+  \code{NULL} if the target is either a file or connection, or a raw
+  vector containing the compressed JPEG image if the target was a raw
+  vector.
 }
 \details{
   \code{writeJPEG} takes an image as input and compresses it into JPEG
   format. The image input is usually a matrix (for grayscale images -
   dimensions are width, height) or an array (for color and alpha
   images - dimensions are width, height, planes) of reals. The planes
-  are interpreted in the sequence red, green, blue. For convenience
-  \code{writeJPEG} allows the source to include alpha channel, but JEPG
-  doe NOT support alpha so it will be discarded.
+  are interpreted in the sequence red, green, blue, alpha. For
+  convenience \code{writeJPEG} allows the source to include alpha
+  channel, but JPEG does NOT support alpha channel so it will be
+  blended against the specified background.
 
   Alternative representation of an image is of \code{nativeRaster} class
   which is an integer matrix with each entry representing one pixel in
@@ -53,19 +55,16 @@ writeJPEG(image, target, quality = 0.7, bg = "white")
   of a native raster.
 
   The result is either stored in a file (if \code{target} is a file
-  name) or in a raw vector (if \code{target} is a raw vector).
+  name), send to a binary connection (if \code{target} is a connection)
+  or stored in a raw vector (if \code{target} is a raw vector).
 }
 %\references{
 %}
 %\author{
 %}
 \note{
-  Currently \code{writeJPEG} only produces 8-bit, deflate-compressed,
-  non-quantized, non-interlaced images. Note in particular that
-  \code{\link{readJPEG}} can read 16-bit channels but storing them
-  back using \code{writeJPEG} will strip the 8 LSB (irrelevant for
-  display purposes but possibly relevant for use of JPEG in
-  signal-processing if the input is truly 16-bit wide).
+  Currently \code{writeJPEG} only produces 8-bit, non-progressive JPEG
+  format with no additional tags.
 }
 \seealso{
 \code{\link{readJPEG}}
@@ -77,12 +76,13 @@ img <- readJPEG(system.file("img","Rlogo.jpg",package="jpeg"))
 r <- writeJPEG(img, raw(), quality=0.3)
 # read it back again
 img2 <- readJPEG(r)
-# it will be different
-identical(img, img2)
+# it will be slightly different since JPEG is a lossy format
+# but not more than a few percent at most
+max(abs(img - img2))
 # try to write a native raster
 img3 <- readJPEG(system.file("img","Rlogo.jpg",package="jpeg"), TRUE)
 r2 <- writeJPEG(img3, raw())
 img4 <- readJPEG(r2, TRUE)
-identical(img3, img4)
+max(abs(img3 - img4))
 }
 \keyword{IO}

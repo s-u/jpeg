@@ -7,7 +7,7 @@ Write a bitmap image in JPEG format
 Create a JPEG image from an array or matrix.
 }
 \usage{
-writeJPEG(image, target = raw(), quality = 0.7, bg = "white")
+writeJPEG(image, target = raw(), quality = 0.7, bg = "white", color.space)
 }
 \arguments{
   \item{image}{image represented by a real matrix or array with values
@@ -27,6 +27,14 @@ writeJPEG(image, target = raw(), quality = 0.7, bg = "white")
     channel since JPEG does not support storage of the alpha channel and
     thus the image needs to be flattened as if it was placed over the
     background of this color.}
+  \item{color.space}{color space in which the image data is to be
+    interpreted. Defaults to the \code{"color.space"} attribute of the
+    image and \code{NULL} is interpreted as the default color space.
+    The color space specified here must match the image array
+    dimensions, no conversions are performed. Currently the only
+    supported non-default color space is \code{"CMYK"} for four-channel
+    images (which would be interpreted as \code{"RGBA"} if the color
+    space is not specified).}    
 }
 \value{
   \code{NULL} if the target is either a file or connection, or a raw
@@ -49,10 +57,10 @@ writeJPEG(image, target = raw(), quality = 0.7, bg = "white")
   obtained from \code{\link{readJPEG}} using \code{native = TRUE}.
 
   Finally, \code{writeJPEG} also supports raw array containing the RGBA
-  image as bytes. The dimensions of the raw array have to be planes,
-  width, height (because the storage is interleaved). Currently only 4
-  planes (RGBA) are supported and the processing is equivalent to that
-  of a native raster.
+  (or CMYK) image as bytes. The dimensions of the raw array have to be
+  planes, width, height (because the storage is interleaved). Currently
+  only 4 planes (RGBA and CMYK) are supported and the processing of RGBA
+  is equivalent to that of a native raster.
 
   The result is either stored in a file (if \code{target} is a file
   name), send to a binary connection (if \code{target} is a connection)

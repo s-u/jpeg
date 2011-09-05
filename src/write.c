@@ -58,11 +58,11 @@ static unsigned int clip_alpha(double v) {
     return (unsigned int)(v * 255.0);
 }
 
-SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
+SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
     SEXP res = R_NilValue, dims, dco;
     const char *fn;
     double quality = Rf_asReal(sQuality);
-    int planes = 1, width, height, native = 0, raw_array = 0, outpl, bg;
+    int planes = 1, width, height, native = 0, raw_array = 0, outpl, bg, cmyk = 0;
     FILE *f = 0;
     struct jpeg_compress_struct *cinfo;
     
@@ -83,6 +83,9 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
     if (dims == R_NilValue || TYPEOF(dims) != INTSXP || LENGTH(dims) < 2 || LENGTH(dims) > 3)
 	Rf_error("image must be a matrix or an array of two or three dimensions");
 
+    if (TYPEOF(sColorsp) == STRSXP && LENGTH(sColorsp) == 1 && !strcmp(CHAR(STRING_ELT(sColorsp, 0)), "CMYK"))
+	cmyk = 1;
+
     if (raw_array && LENGTH(dims) == 3) { /* raw arrays have either bpp, width, height or width, height dimensions */
 	planes = INTEGER(dims)[0];
 	width = INTEGER(dims)[1];
@@ -94,6 +97,9 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
 	    planes = INTEGER(dims)[2];
     }
 
+    if (cmyk && planes != 4)
+	Rf_error("CMYK image must have exactly 4 planes");
+
     if (planes < 1 || planes > 4)
 	Rf_error("image must have either 1 (grayscale), 2 (GA), 3 (RGB) or 4 (RGBA) planes");
 
@@ -102,6 +108,8 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
 
     if (native) { /* nativeRaster should have a "channels" attribute if it has anything else than 4 channels */
 	SEXP cha = getAttrib(image, install("channels"));
+	if (cmyk)
+	    Rf_error("CMYK cannot be represented by nativeRaster");
 	if (cha != R_NilValue) {
 	    planes = asInteger(cha);
 	    if (planes < 1 || planes > 4)
@@ -109,6 +117,7 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
 	} else
 	    planes = 4;
     }
+
     /* FIXME: for JPEG 3-channel raw array may also make sense ...*/
     if (raw_array) {
 	if (planes != 4)
@@ -144,13 +153,13 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
 	jpeg_stdio_dest(cinfo, f);
     }
 
-    /* JPEG only supports RGB or G (apart from CMYK that we don't use...) */
-    outpl = (planes > 2) ? 3 : 1;
+    /* JPEG only supports RGB or G (apart from CMYK) */
+    outpl = cmyk ? 4 : ((planes > 2) ? 3 : 1);
 
     cinfo->image_width = width;
     cinfo->image_height = height;
     cinfo->input_components = outpl;
-    cinfo->in_color_space = (outpl == 3) ? JCS_RGB : JCS_GRAYSCALE;
+    cinfo->in_color_space = cmyk ? JCS_CMYK : ((outpl == 3) ? JCS_RGB : JCS_GRAYSCALE);
 
     jpeg_set_defaults(cinfo);
 
@@ -186,7 +195,7 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
 			unsigned int a = clip_alpha(data[y + x * height + pls]);
 			if (a != 255) flat_rows[y * rowbytes + x] = ABLEND(flat_rows[y * rowbytes + x], a, R_RED(bg));
 		    }
-	    } else if(planes == 4) {
+	    } else if (planes == 4 && !cmyk) {
 		for(y = 0; y < height; y++)
 		    for (x = 0; x < width; x++) {
 			unsigned int a = clip_alpha(data[y + x * height + 3 * pls]);
@@ -198,7 +207,9 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg) {
 		    }
 	    }
 	} else {
-	    if (planes == 4) { /* RGBA */
+	    if (planes == 4 && cmyk) { /* CMYK - from raw input, not really native */
+		memcpy(flat_rows, (char*) INTEGER(res), rowbytes * height);
+	    } else if (planes == 4) { /* RGBA */
 		int x, y, *idata = INTEGER(res);
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < rowbytes; idata++) {

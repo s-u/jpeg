@@ -29,6 +29,7 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
     SEXP res = R_NilValue, dim, dco;
     int native = asInteger(sNative);
     FILE *f = 0;
+    J_COLOR_SPACE color_space;
 
     struct jpeg_decompress_struct *cinfo;
 
@@ -45,6 +46,9 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
     }
 
     jpeg_read_header(cinfo, TRUE);
+
+    color_space = cinfo->out_color_space;
+
     jpeg_start_decompress(cinfo);
 	
     {
@@ -55,7 +59,8 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 	JSAMPROW line;
 
 #if VERBOSE_INFO
-	Rprintf("jpeg: %d x %d [%d], %d bytes\n", width, height, pln, rowbytes);
+	Rprintf("jpeg: %d x %d [%d], %d bytes (color space: %d -> %d)\n", width, height, pln, rowbytes,
+		cinfo->jpeg_color_space, color_space);
 #endif
 
 	/* on little-endian machines it's all well, but on big-endian ones we'll have to swap */
@@ -151,6 +156,19 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
        for the garbage collection */
     Rjpeg_fin(dco);
     UNPROTECT(1);
+
+    if (color_space != JCS_GRAYSCALE && color_space != JCS_RGB) {
+	SEXP cs0, cs1;
+	const char *csn = "unknown";
+	PROTECT(res);
+	cs0 = Rf_install("color.space");
+	if (color_space == JCS_YCbCr) csn = "YCbCr";
+	if (color_space == JCS_CMYK) csn = "CMYK";
+	if (color_space == JCS_YCCK) csn = "YCbCrK";
+	cs1 = PROTECT(mkString(csn));
+	setAttrib(res, cs0, cs1);
+	UNPROTECT(2);
+    }
 
     return res;
 }

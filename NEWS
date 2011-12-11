@@ -1,6 +1,6 @@
 NEWS/Changelog
 
-0.1-2	(under development)
+0.1-2	2011-12-10
     o	allow conections as target for writeJPEG()
 
     o	make raw() the default target in writeJPEG()

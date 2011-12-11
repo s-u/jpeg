@@ -39,9 +39,13 @@ such situations.
 %}
 %\author{
 %}
-%\note{
-%}
-
+\note{
+  CMYK JPEG images saved by Adobe Photoshop may have inverted ink values due
+  to a bug in Photoshop. Unfortunately this includes some sample CMYK
+  images that are floating around, so beware of the source when
+  converting the result to other color spaces. \code{readJPEG} will
+  preserve values exactly as they are encoded in the file.
+}
 \seealso{
 \code{\link{rasterImage}}, \code{\link{writeJPEG}}
 }

@@ -40,6 +40,15 @@ skip_input_data (struct jpeg_decompress_struct *cinfo, long num_bytes)
     }
 }
 
+/* libjpeg-turbo 1.2.90 reportedly breaks as it is doing something nasty
+   with the JPEG_LIB_VERSION and it defines jpeg_mem_src even though
+   it masquarades as jpeg < 8 ... strange, but to work around it we make sure
+   that our compatibility layer uses a different symbol name */
+#ifdef jpeg_mem_src
+#undef jpeg_mem_src
+#endif
+#define jpeg_mem_src jcompat_jpeg_mem_src
+
 static void jpeg_mem_src (struct jpeg_decompress_struct *cinfo,
 			  unsigned char *inbuffer, unsigned long insize) {
     struct jpeg_source_mgr *src;

@@ -1,5 +1,8 @@
 NEWS/Changelog
 
+0.1-3	(under development)
+    o	work around a probelm in libjpeg-turbo8 1.2.90
+
 0.1-2	2011-12-10
     o	allow conections as target for writeJPEG()
 

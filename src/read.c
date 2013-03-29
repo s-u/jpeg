@@ -1,4 +1,6 @@
 #include "rjcommon.h"
+/* compatibility implementation of jpeg_mem_src() if not provided by jpeg */
+#include "jcompat.h"
 
 /* create an R object containing the initialized decompression
    structure. The object will ensure proper release of the jpeg struct. */

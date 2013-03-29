@@ -9,8 +9,6 @@
 #include <string.h>
 #include <jpeglib.h>
 
-#include "jcompat.h"
-
 #if (BITS_IN_JSAMPLE != 8)
 #error "Sorry, only 8-bit libjpeg is supported"
 #endif

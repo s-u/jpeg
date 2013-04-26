@@ -4,5 +4,5 @@ WIN=32
 endif
 
 # use the supplied binaries
-PKG_CFLAGS=-Iwin$(WIN)
+PKG_CPPFLAGS=-Iwin$(WIN)
 PKG_LIBS=win$(WIN)/libjpeg.a

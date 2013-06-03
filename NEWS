@@ -1,5 +1,11 @@
 NEWS/Changelog
 
+0.1-5	2013-06-03
+    o	work around issues in jpeg-9 which re-defines boolean
+
+    o	add support for LOCAL_SOFT on Windows
+
+
 0.1-4	2013-04-26
     o	use PKG_CPPFLAGS on Windows such that the presence
 	of external jpeg headers does not conflict with

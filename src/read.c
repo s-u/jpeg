@@ -47,7 +47,7 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 	jpeg_stdio_src(cinfo, f);
     }
 
-    jpeg_read_header(cinfo, TRUE);
+    jpeg_read_header(cinfo, JPEG_TRUE);
 
     color_space = cinfo->out_color_space;
 

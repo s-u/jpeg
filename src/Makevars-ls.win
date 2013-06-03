@@ -1,0 +1,2 @@
+## This Makevars is used on Windows when system jpeg is to be used
+PKG_LIBS=-ljpeg

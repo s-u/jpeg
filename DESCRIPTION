@@ -1,5 +1,5 @@
 Package: jpeg
-Version: 0.1-5
+Version: 0.1-6
 Title: Read and write JPEG images
 Author: Simon Urbanek <Simon.Urbanek@r-project.org>
 Maintainer: Simon Urbanek <Simon.Urbanek@r-project.org>

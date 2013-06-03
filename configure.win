@@ -30,7 +30,10 @@ else
     echo "  LOCAL_SOFT does not exist, fall back to external jpeg"
 fi
 
-if [ ${use_local} = no ]; then
+if [ ${use_local} = yes ]; then
+    mv src/Makevars.win src/Makevars-in.win
+    mv src/Makevars-ls.win src/Makevars.win
+else
     if [ ! -e src/win32/libjpeg.a ]; then
 	if [ ! -e src/libjpeg-current-win.tar.gz ]; then
 	    echo "  cannot find current JPEG files"

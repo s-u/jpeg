@@ -168,7 +168,7 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
     if (isnan(quality)) quality = 0.7;
     jpeg_set_quality(cinfo, (int) (quality * 100.0 + 0.49), FALSE);
     /* jpeg_simple_progression(cinfo); optional */
-    jpeg_start_compress(cinfo, JPEG_TRUE);
+    jpeg_start_compress(cinfo, TRUE);
 
     {
 	int rowbytes = width * outpl;

@@ -7,27 +7,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-/* some jpeg versions re-define TRUE/FALSE .. bad bad so we have to tuck those away */
-#ifdef TRUE
-#undef TRUE
-#endif
-#ifdef FALSE
-#undef FALSE
-#endif
-#define TRUE JPEG_TRUE
-#define FALSE JPEG_FALSE
+
+#define USE_RINTERNALS 1
+#define R_NO_REMAP 1
+#include <Rinternals.h>
+/* for R_RGB / R_RGBA */
+#include <R_ext/GraphicsEngine.h>
+
+/* some jpeg headers are a bad mess (undefining and re-defining TRUE/FALSE...)
+   so we have to include them only *after* R */
 #include <jpeglib.h>
-#undef TRUE
-#undef FALSE
 
 #if (BITS_IN_JSAMPLE != 8)
 #error "Sorry, only 8-bit libjpeg is supported"
 #endif
-
-#define USE_RINTERNALS 1
-#include <Rinternals.h>
-/* for R_RGB / R_RGBA */
-#include <R_ext/GraphicsEngine.h>
 
 METHODDEF(void)
 Rjpeg_error_exit(j_common_ptr cinfo)

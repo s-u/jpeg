@@ -1,5 +1,9 @@
 NEWS/Changelog
 
+0.1-7	2014-01-23
+    o	more compatibility fixes for jpeg versions that 
+	have broken header files
+
 0.1-6	2013-06-03
     o	fix LOCAL_SOFT support on Windows
 

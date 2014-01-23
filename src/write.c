@@ -66,11 +66,11 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
     FILE *f = 0;
     struct jpeg_compress_struct *cinfo;
     
-    if (length(sBg) < 1)
+    if (Rf_length(sBg) < 1)
 	Rf_error("invalid background color specification");
     bg = RGBpar(sBg, 0);
 
-    if (inherits(image, "nativeRaster") && TYPEOF(image) == INTSXP)
+    if (Rf_inherits(image, "nativeRaster") && TYPEOF(image) == INTSXP)
 	native = 1;
     
     if (TYPEOF(image) == RAWSXP)
@@ -107,11 +107,11 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
 	Rf_error("native raster must be a matrix");
 
     if (native) { /* nativeRaster should have a "channels" attribute if it has anything else than 4 channels */
-	SEXP cha = getAttrib(image, install("channels"));
+	SEXP cha = Rf_getAttrib(image, Rf_install("channels"));
 	if (cmyk)
 	    Rf_error("CMYK cannot be represented by nativeRaster");
 	if (cha != R_NilValue) {
-	    planes = asInteger(cha);
+	    planes = Rf_asInteger(cha);
 	    if (planes < 1 || planes > 4)
 		planes = 4;
 	} else
@@ -255,7 +255,7 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
     
     {
 	unsigned long len = (char*)cinfo->dest->next_output_byte - (char*)Rjpeg_mem_ptr(cinfo);
-	res = allocVector(RAWSXP, len);
+	res = Rf_allocVector(RAWSXP, len);
 	memcpy(RAW(res), Rjpeg_mem_ptr(cinfo), len);
     }
     

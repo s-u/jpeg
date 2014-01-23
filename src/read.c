@@ -29,7 +29,7 @@ static SEXP Rjpeg_decompress(struct jpeg_decompress_struct **cinfo_ptr) {
 SEXP read_jpeg(SEXP sFn, SEXP sNative) {
     const char *fn;
     SEXP res = R_NilValue, dim, dco;
-    int native = asInteger(sNative);
+    int native = Rf_asInteger(sNative);
     FILE *f = 0;
     J_COLOR_SPACE color_space;
 
@@ -93,7 +93,7 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 		Rf_error("native output for %d planes is not possible.", pln);
 	    }
 	    
-	    res = PROTECT(allocVector(INTSXP, width * height));
+	    res = PROTECT(Rf_allocVector(INTSXP, width * height));
 	    if (pln == 4) { /* 4 planes - efficient - just copy it all */
 		int *idata = INTEGER(res);
 		memcpy(idata, image, rowbytes * height);
@@ -123,18 +123,18 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 		    c++;
 		}
 	    }
-	    dim = allocVector(INTSXP, 2);
+	    dim = Rf_allocVector(INTSXP, 2);
 	    INTEGER(dim)[0] = height;
 	    INTEGER(dim)[1] = width;
-	    setAttrib(res, R_DimSymbol, dim);
-	    setAttrib(res, R_ClassSymbol, mkString("nativeRaster"));
-	    setAttrib(res, install("channels"), ScalarInteger(pln));
+	    Rf_setAttrib(res, R_DimSymbol, dim);
+	    Rf_setAttrib(res, R_ClassSymbol, Rf_mkString("nativeRaster"));
+	    Rf_setAttrib(res, Rf_install("channels"), Rf_ScalarInteger(pln));
 	    UNPROTECT(1);
 	} else {
 	    int x, y, p, pls = width * height;
 	    double *data;
 
-	    res = PROTECT(allocVector(REALSXP, height * rowbytes));
+	    res = PROTECT(Rf_allocVector(REALSXP, height * rowbytes));
 	    data = REAL(res);
 
 	    for(y = 0; y < height; y++)
@@ -142,12 +142,12 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 		    for (p = 0; p < pln; p++)
 			data[y + x * height + p * pls] = ((double)image[y * rowbytes + x * pln + p]) / 255.0;
 
-	    dim = allocVector(INTSXP, (pln > 1) ? 3 : 2);
+	    dim = Rf_allocVector(INTSXP, (pln > 1) ? 3 : 2);
 	    INTEGER(dim)[0] = height;
 	    INTEGER(dim)[1] = width;
 	    if (pln > 1)
 		INTEGER(dim)[2] = pln;
-	    setAttrib(res, R_DimSymbol, dim);
+	    Rf_setAttrib(res, R_DimSymbol, dim);
 	    UNPROTECT(1);
 	}
     }
@@ -167,8 +167,8 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 	if (color_space == JCS_YCbCr) csn = "YCbCr";
 	if (color_space == JCS_CMYK) csn = "CMYK";
 	if (color_space == JCS_YCCK) csn = "YCbCrK";
-	cs1 = PROTECT(mkString(csn));
-	setAttrib(res, cs0, cs1);
+	cs1 = PROTECT(Rf_mkString(csn));
+	Rf_setAttrib(res, cs0, cs1);
 	UNPROTECT(2);
     }
 

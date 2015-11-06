@@ -69,7 +69,7 @@ static void Rjpeg_fin(SEXP dco) {
         free(cinfo);
     }
     /* make it a NULL ptr in case this was not a finalizer call */
-    CAR(dco) = 0;
+    R_ClearExternalPtr(dco);
 }
 
 static struct jpeg_error_mgr *Rjpeg_new_err() {

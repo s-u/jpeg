@@ -3,6 +3,15 @@
 /* alpha - blending:  X * A + (1 - X) * BG   */
 #define ABLEND(X, A, BG)  (JSAMPLE) ((((unsigned int)X) * ((unsigned int)A) + ((unsigned int)BG) * (255 - ((unsigned int)A))) / 255)
 
+/* we could jsut use (int*)DATAPTR(x) but this is safer */
+static int *D_INTEGER(SEXP x) {
+    if (TYPEOF(x) == INTSXP)
+	return INTEGER(x);
+    if (TYPEOF(x) == RAWSXP)
+	return (int*) RAW(x);
+    Rf_error("Invalid native image, must be integer or raw vector");
+}
+
 /* create an R object containing the initialized compression
    structure. The object will ensure proper release of the jpeg struct. */
 static SEXP Rjpeg_compress(struct jpeg_compress_struct **cinfo_ptr) {
@@ -208,9 +217,9 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
 	    }
 	} else {
 	    if (planes == 4 && cmyk) { /* CMYK - from raw input, not really native */
-		memcpy(flat_rows, (char*) INTEGER(image), rowbytes * height);
+		memcpy(flat_rows, (char*) D_INTEGER(image), rowbytes * height);
 	    } else if (planes == 4) { /* RGBA */
-		int x, y, *idata = INTEGER(image);
+		int x, y, *idata = D_INTEGER(image);
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < rowbytes; idata++) {
 			flat_rows[y * rowbytes + x++] = ABLEND(R_RED(*idata),   R_ALPHA(*idata), R_RED(bg));
@@ -218,7 +227,7 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
 			flat_rows[y * rowbytes + x++] = ABLEND(R_BLUE(*idata),  R_ALPHA(*idata), R_BLUE(bg));
 		    }
 	    } else if (planes == 3) { /* RGB */
-		int x, y, *idata = INTEGER(image);
+		int x, y, *idata = D_INTEGER(image);
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < rowbytes; idata++) {
 			flat_rows[y * rowbytes + x++] = R_RED(*idata);
@@ -226,12 +235,12 @@ SEXP write_jpeg(SEXP image, SEXP sFn, SEXP sQuality, SEXP sBg, SEXP sColorsp) {
 			flat_rows[y * rowbytes + x++] = R_BLUE(*idata);
 		    }
 	    } else if (planes == 2) { /* GA */
-		int x, y, *idata = INTEGER(image);
+		int x, y, *idata = D_INTEGER(image);
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < rowbytes; idata++)
 			flat_rows[y * rowbytes + x++] = ABLEND(R_RED(*idata), R_ALPHA(*idata), R_RED(bg));
 	    } else { /* gray */
-		int x, y, *idata = INTEGER(image);
+		int x, y, *idata = D_INTEGER(image);
 		for (y = 0; y < height; y++)
 		    for (x = 0; x < rowbytes; idata++)
 			flat_rows[y * rowbytes + x++] = R_RED(*idata);

@@ -1,8 +1,11 @@
 NEWS/Changelog
 
-0.1-9	(under development)
+0.1-9	2021-07-24
     o	use R_ClearExternalPtr() instead of CAR()=0 to
 	be more API-compliant
+
+    o	minor R API compliance cleanup
+
 
 0.1-8	2014-01-23
     o	more compatibility fixes for jpeg versions that 

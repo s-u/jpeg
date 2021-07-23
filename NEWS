@@ -6,6 +6,8 @@ NEWS/Changelog
 
     o	minor R API compliance cleanup
 
+    o	added native symbol registration
+
 
 0.1-8	2014-01-23
     o	more compatibility fixes for jpeg versions that 

@@ -1,2 +1,2 @@
-useDynLib(jpeg)
+useDynLib(jpeg, read_jpeg, write_jpeg)
 exportPattern(".*JPEG")

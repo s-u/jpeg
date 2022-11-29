@@ -1,5 +1,10 @@
 NEWS/Changelog
 
+0.1-10	2022-11-29
+    o	minor cleanup to avoid strict prototype and protect
+	warnings
+
+
 0.1-9	2021-07-24
     o	use R_ClearExternalPtr() instead of CAR()=0 to
 	be more API-compliant

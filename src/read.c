@@ -128,8 +128,8 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 	    INTEGER(dim)[1] = width;
 	    Rf_setAttrib(res, R_DimSymbol, dim);
 	    Rf_setAttrib(res, R_ClassSymbol, Rf_mkString("nativeRaster"));
-	    Rf_setAttrib(res, Rf_install("channels"), Rf_ScalarInteger(pln));
-	    UNPROTECT(1);
+	    Rf_setAttrib(res, Rf_install("channels"), PROTECT(Rf_ScalarInteger(pln)));
+	    UNPROTECT(2);
 	} else {
 	    int x, y, p, pls = width * height;
 	    double *data;

@@ -72,7 +72,7 @@ static void Rjpeg_fin(SEXP dco) {
     R_ClearExternalPtr(dco);
 }
 
-static struct jpeg_error_mgr *Rjpeg_new_err() {
+static struct jpeg_error_mgr *Rjpeg_new_err(void) {
     struct jpeg_error_mgr *jerr = (struct jpeg_error_mgr*) calloc(sizeof(struct Rjpeg_error_mgr), 1);
     if (!jerr) Rf_error("Unable to allocate jpeg error management structure");
     jpeg_std_error(jerr);

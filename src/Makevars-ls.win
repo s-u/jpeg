@@ -1,2 +1,6 @@
 ## This Makevars is used on Windows when system jpeg is to be used
-PKG_LIBS=-ljpeg
+ifeq (,$(shell pkg-config --version 2>/dev/null))
+  PKG_LIBS=-ljpeg
+else
+  PKG_LIBS=$(shell pkg-config --libs libjpeg)
+endif

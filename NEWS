@@ -1,5 +1,15 @@
 NEWS/Changelog
 
+0.1-11	2025-03-21
+    o	turn jpeg messages to warnings (#4)
+
+    o	work around missing bool in R 4.5.0 (#12, #13)
+
+    o	mention EXIT orientation (#1)
+
+    o	use pkg-config on Windows (#11)
+
+
 0.1-10	2022-11-29
     o	minor cleanup to avoid strict prototype and protect
 	warnings

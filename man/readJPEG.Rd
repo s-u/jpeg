@@ -45,6 +45,11 @@ such situations.
   images that are floating around, so beware of the source when
   converting the result to other color spaces. \code{readJPEG} will
   preserve values exactly as they are encoded in the file.
+
+  Some images use EXIF to indicate that the image is stored in one orientation,
+  but should be viewed in another. \code{readJPEG} will return the image as it
+  was stored, so refer to EXIF's "orientation" property for more details (e.g.,
+  see the \code{read_exif} function in the \code{exifr} package).
 }
 \seealso{
 \code{\link{rasterImage}}, \code{\link{writeJPEG}}

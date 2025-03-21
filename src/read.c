@@ -131,16 +131,33 @@ SEXP read_jpeg(SEXP sFn, SEXP sNative) {
 	    Rf_setAttrib(res, Rf_install("channels"), PROTECT(Rf_ScalarInteger(pln)));
 	    UNPROTECT(2);
 	} else {
-	    int x, y, p, pls = width * height;
-	    double *data;
+            res = PROTECT(Rf_allocVector(REALSXP, height * rowbytes));
 
-	    res = PROTECT(Rf_allocVector(REALSXP, height * rowbytes));
-	    data = REAL(res);
+            {
+                double *data;
+                data = REAL(res);
 
-	    for(y = 0; y < height; y++)
-		for (x = 0; x < width; x++)
-		    for (p = 0; p < pln; p++)
-			data[y + x * height + p * pls] = ((double)image[y * rowbytes + x * pln + p]) / 255.0;
+                int const pls = width * height;
+                for (int y = 0; y < height; y++) {
+                    int const i_y_part = y * rowbytes;
+                    for (int x = 0; x < width; x++) {
+                        int const i_xy_part = x * pln + i_y_part;
+                        int const d_xy_part = y + x * height;
+                        for (int p = 0; p < pln; p++) {
+                            data[d_xy_part + p * pls] = ((double)image[i_xy_part + p]) / 255.0;
+                        }
+                    }
+                }
+            }
+
+            /*
+             * This is the fastest way.
+             * It takes about 60% of the time for a 4.2 MB file.
+             * However, the dimentions needs to be in a different order: pls, width, height.  Unfortunately, that would surely break old code.
+             *
+                for (size_t i = 0; i < last_index; ++i) {
+                    data[i] = ((double) image[i]) / 255.0;
+            */
 
 	    dim = Rf_allocVector(INTSXP, (pln > 1) ? 3 : 2);
 	    INTEGER(dim)[0] = height;

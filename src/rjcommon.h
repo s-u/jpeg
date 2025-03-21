@@ -19,6 +19,16 @@
 typedef enum { R_FALSE = 0, R_TRUE, } Rboolean;
 /* R headers don't use TRUE/FALSE so we shoudl notneed to worry about those */
 
+/* R 4.5.0 also requires bool from stdbool.h (and C99) */
+#include <Rversion.h>
+#if R_VERSION >= R_Version(4,5,0)
+#if defined __STDC_VERSION__ && __STDC_VERSION__ > 202000L
+/* in C23 bool is a keyword to not needed */
+#else /* otherwise it is needed */
+#include <stdbool.h>
+#endif /* ! C23 */
+#endif /* R 4.5.0+ */
+
 #define USE_RINTERNALS 1
 #define R_NO_REMAP 1
 #include <Rinternals.h>

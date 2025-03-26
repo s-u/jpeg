@@ -8,5 +8,5 @@ Depends: R (>= 2.9.0)
 Description: This package provides an easy and simple way to read, write and display bitmap images stored in the JPEG format. It can read and write both files and in-memory raw vectors.
 License: GPL-2 | GPL-3
 SystemRequirements: libjpeg
-URL: https://www.rforge.net/jpeg/
+URL: https://www.rforge.net/jpeg/, https://github.com/s-u/jpeg
 BugReports: https://github.com/s-u/jpeg/issues
